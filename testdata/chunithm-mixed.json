@@ -1,0 +1,15 @@
+{
+  "game": "chunithm",
+  "playerName": "ＭＯＣＫ",
+  "rating": 15.87,
+  "fetchedAt": "2026-08-04T12:00:00+09:00",
+  "toolVersion": "testdata",
+  "best": [
+    { "title": "Ascension to Heaven", "difficulty": "MASTER", "level": 15.0, "isConstant": true, "score": 1006512, "ratingValue": 16.2, "jacketUrl": null },
+    { "title": "To：Be Continued", "difficulty": "ULTIMA", "level": 14.9, "isConstant": true, "score": 1007120, "ratingValue": 16.12, "jacketUrl": null },
+    { "title": "Random", "difficulty": "MASTER", "level": 14.8, "isConstant": true, "score": 1006890, "ratingValue": 16.04, "jacketUrl": null },
+    { "title": "Trrricksters!!", "difficulty": "MASTER", "level": 14.7, "isConstant": true, "score": 1007433, "ratingValue": 15.96, "jacketUrl": null },
+    { "title": "マツヨイナイトバグ", "difficulty": "ULTIMA", "level": 14.6, "isConstant": true, "score": 1008012, "ratingValue": 15.88, "jacketUrl": null }
+  ],
+  "recent": []
+}

@@ -1,0 +1,15 @@
+{
+  "game": "ongeki",
+  "playerName": "ＭＯＣＫ",
+  "rating": 12.45,
+  "fetchedAt": "2026-08-04T12:00:00+09:00",
+  "toolVersion": "testdata",
+  "best": [
+    { "title": "Titania", "difficulty": "LUNATIC", "level": 15.0, "isConstant": true, "score": 1002890, "ratingValue": 13.5, "jacketUrl": null },
+    { "title": "Apollo", "difficulty": "MASTER", "level": 14.9, "isConstant": true, "score": 1003210, "ratingValue": 13.4, "jacketUrl": null },
+    { "title": "Opfer", "difficulty": "MASTER", "level": 14.8, "isConstant": true, "score": 1002654, "ratingValue": 13.3, "jacketUrl": null },
+    { "title": "Recursive Function", "difficulty": "MASTER", "level": 14.7, "isConstant": true, "score": 1003876, "ratingValue": 13.2, "jacketUrl": null },
+    { "title": "Viyella's Tears", "difficulty": "LUNATIC", "level": 14.6, "isConstant": true, "score": 1004123, "ratingValue": 13.1, "jacketUrl": null }
+  ],
+  "recent": []
+}

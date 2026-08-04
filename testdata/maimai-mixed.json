@@ -1,0 +1,15 @@
+{
+  "game": "maimai",
+  "playerName": "ＭＯＣＫ",
+  "rating": 14263,
+  "fetchedAt": "2026-08-04T12:00:00+09:00",
+  "toolVersion": "testdata",
+  "best": [
+    { "title": "PANDORA PARADOXXX", "difficulty": "Re:MASTER", "level": 15.0, "isConstant": true, "score": 100.1021, "ratingValue": 310, "jacketUrl": null },
+    { "title": "系ぎて", "difficulty": "MASTER", "level": 14.9, "isConstant": true, "score": 100.2152, "ratingValue": 307, "jacketUrl": null },
+    { "title": "Valsqotch", "difficulty": "MASTER", "level": 14.8, "isConstant": true, "score": 100.1877, "ratingValue": 304, "jacketUrl": null },
+    { "title": "World Vanquisher", "difficulty": "Re:MASTER", "level": 14.7, "isConstant": true, "score": 100.2001, "ratingValue": 301, "jacketUrl": null },
+    { "title": "Garakuta Doll Play", "difficulty": "MASTER", "level": 14.6, "isConstant": true, "score": 100.2563, "ratingValue": 298, "jacketUrl": null }
+  ],
+  "recent": []
+}
