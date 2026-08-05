@@ -97,53 +97,8 @@
 
   async function run_maimai() {
   const VERSION = '0.2.0';
-  // レーティング対象曲ページ以外ならマーク収集モード（FC/AP・SYNC用）。
-  // fetchは全経路/error/へリダイレクトされるため、マークは表示中のページの
-  // DOMから拾ってlocalStorageに貯め、対象曲ページでの実行時に合流させる。
-  // ページ構造に依存しないよう、曲名要素から親をたどって行を特定する。
   if (!location.pathname.includes('ratingTargetMusic')) {
-    const nameEls = document.querySelectorAll('.music_name_block');
-    if (nameEls.length > 0) {
-      const store = JSON.parse(localStorage.getItem('grc-marks') ?? '{}');
-      const seen = new Set();
-      let n = 0;
-      for (const nameEl of nameEls) {
-        const row = nameEl.closest('form') ?? nameEl.parentElement;
-        if (!row) continue;
-        const title = nameEl.textContent.trim();
-        if (!title) continue;
-        const icons = [...row.querySelectorAll('img')].map((i) => i.getAttribute('src') ?? '');
-        icons.forEach((s) => {
-          const m = s.match(/music_icon_[a-z0-9_]+/);
-          if (m) seen.add(m[0]);
-        });
-        // 難易度は行のclassか、行内のdiff_*.png画像から判定する
-        const cls = row.className + ' ' + (row.parentElement?.className ?? '');
-        const diffSrc = icons.find((s) => /diff_[a-z]+\.png/.test(s)) ?? '';
-        const dtext = cls + ' ' + diffSrc;
-        const diffNo = /remaster/.test(dtext) ? 4 : /master/.test(dtext) ? 3
-          : /expert/.test(dtext) ? 2 : /advanced/.test(dtext) ? 1 : 0;
-        const has = (x) => icons.some((u) => u.includes(`music_icon_${x}.`));
-        const dx = icons.some((u) => u.includes('music_dx')) ? 1 : 0;
-        const comboMark = has('app') ? 'AP+' : has('ap') ? 'AP'
-          : has('fcp') ? 'FC+' : has('fc') ? 'FC' : null;
-        const syncMark = has('fsdp') ? 'FDX+' : has('fsd') ? 'FDX'
-          : has('fsp') ? 'FS+' : has('fs') ? 'FS' : null;
-        if (comboMark || syncMark) {
-          store[`${title}|${diffNo}|${dx}`] = { comboMark, syncMark };
-          n++;
-        }
-      }
-      localStorage.setItem('grc-marks', JSON.stringify(store));
-      console.log('[maimai] このページのマークアイコン:', [...seen].sort().join(', ') || '(なし)');
-      alert(`このページから ${n} 曲のマークを記録しました（累計 ${Object.keys(store).length} 件）。\n` +
-        `曲数 ${nameEls.length}、検出アイコン: ${[...seen].sort().join(', ') || 'なし'}\n` +
-        '難易度ごとにスコア一覧を開いて実行し、最後にレーティング対象曲ページで実行してください');
-      return;
-    }
-  }
-  if (!location.pathname.includes('ratingTargetMusic')) {
-    alert('レーティング対象曲ページ（レコード→RATING対象曲）で実行してください\n※このページの閲覧にはmaimaiでらっくすNETのスタンダードコース（有料）加入が必要です\n（FC/APマークを入れたい場合は、先にレコード→ジャンル別スコアページでも実行）');
+    alert('レーティング対象曲ページ（レコード→RATING対象曲）で実行してください\n※このページの閲覧にはmaimaiでらっくすNETのスタンダードコース（有料）加入が必要です');
     return;
   }
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -233,21 +188,81 @@
     console.warn('[maimai] 定数DB取得失敗（レベル・単曲レートなしで続行）:', e.message);
   }
 
-  // ---- FC/APマーク（ジャンル別スコアページで事前収集したものを適用） ----
+  // ---- FC/AP・SYNCマーク ----
+  // マークは対象曲ページに無く、fetchは全経路/error/へリダイレクトされる。
+  // ただし同一オリジンの隠しiframeはページ遷移として扱われて読めるため、
+  // 難易度別スコア一覧をこのページに居たまま読み込んで拾う。
   {
     const DIFF_NO = { BASIC: 0, ADVANCED: 1, EXPERT: 2, MASTER: 3, 'Re:MASTER': 4 };
-    const store = JSON.parse(localStorage.getItem('grc-marks') ?? '{}');
+    const need = new Set([...buckets.new, ...buckets.best].map((s) => DIFF_NO[s.difficulty]));
+    const marks = new Map();
+    const seenIcons = new Set();
+    const readFrame = (url) =>
+      new Promise((res) => {
+        const f = document.createElement('iframe');
+        f.style.cssText = 'position:fixed;left:-9999px;top:0;width:1px;height:1px;opacity:0;';
+        const timer = setTimeout(() => {
+          f.remove();
+          res(0);
+        }, 20000);
+        f.onload = () => {
+          clearTimeout(timer);
+          let n = 0;
+          try {
+            const doc = f.contentDocument;
+            for (const nameEl of doc.querySelectorAll('.music_name_block')) {
+              const row = nameEl.closest('form') ?? nameEl.parentElement;
+              if (!row) continue;
+              const icons = [...row.querySelectorAll('img')].map((i) => i.getAttribute('src') ?? '');
+              icons.forEach((s) => {
+                const m = s.match(/music_icon_[a-z0-9_]+/);
+                if (m) seenIcons.add(m[0]);
+              });
+              const has = (x) => icons.some((u) => u.includes(`music_icon_${x}.`));
+              const cls = row.className + ' ' + (row.parentElement?.className ?? '');
+              const diffSrc = icons.find((s) => /diff_[a-z]+\.png/.test(s)) ?? '';
+              const dtext = cls + ' ' + diffSrc;
+              const dno = /remaster/.test(dtext) ? 4 : /master/.test(dtext) ? 3
+                : /expert/.test(dtext) ? 2 : /advanced/.test(dtext) ? 1 : 0;
+              const dx = icons.some((u) => u.includes('music_dx')) ? 1 : 0;
+              const comboMark = has('app') ? 'AP+' : has('ap') ? 'AP'
+                : has('fcp') ? 'FC+' : has('fc') ? 'FC' : null;
+              const syncMark = has('fsdp') ? 'FDX+' : has('fsd') ? 'FDX'
+                : has('fsp') ? 'FS+' : has('fs') ? 'FS' : null;
+              if (comboMark || syncMark) {
+                marks.set(`${nameEl.textContent.trim()}|${dno}|${dx}`, { comboMark, syncMark });
+                n++;
+              }
+            }
+          } catch (e) {
+            console.warn('[maimai] iframe読み取り失敗:', e.message);
+          }
+          f.remove();
+          res(n);
+        };
+        f.src = url;
+        document.body.appendChild(f);
+      });
+
+    for (const dno of [...need].sort()) {
+      window.__grcProgress?.(`マーク取得中… 難易度${dno + 1}/${need.size}`);
+      const n = await readFrame(
+        `${location.origin}/maimai-mobile/record/musicGenre/search/?genre=99&diff=${dno}`);
+      console.log(`[maimai] 難易度${dno}: マーク${n}件`);
+      await sleep(1200);
+    }
+    console.log('[maimai] スコア一覧のアイコン:', [...seenIcons].sort().join(', ') || '(なし)');
+
     let hit = 0;
     for (const s of [...buckets.new, ...buckets.best]) {
-      const m = store[`${s.title}|${DIFF_NO[s.difficulty]}|${s._dx ? 1 : 0}`];
+      const m = marks.get(`${s.title}|${DIFF_NO[s.difficulty]}|${s._dx ? 1 : 0}`);
       if (m) {
         s.comboMark = m.comboMark;
         s.syncMark = m.syncMark;
         hit++;
       }
     }
-    console.log(`[maimai] マーク適用: ${hit}曲（収集済み${Object.keys(store).length}件。` +
-      '0件の場合はジャンル別スコアページで先に実行すると入ります）');
+    console.log(`[maimai] マーク適用: ${hit}曲 / 収集${marks.size}件`);
   }
 
   // ---- ジャケット（同一オリジンの公式画像→data URL） ----
