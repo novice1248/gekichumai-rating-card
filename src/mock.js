@@ -90,12 +90,13 @@ export const MOCK_DATA = {
   },
   chunithm: {
     game: 'chunithm', playerName: 'ＭＯＣＫ', rating: 16.52, fetchedAt: NOW, toolVersion: 'mock',
-    best: chunithmSongs(30, 14.8, ['MASTER', 'MASTER', 'ULTIMA', 'EXPERT']),
+    // 難易度色の見え方を確認できるよう、上位にULTIMA・EXPERTが並ぶ順にしている
+    best: chunithmSongs(30, 14.8, ['ULTIMA', 'MASTER', 'EXPERT', 'MASTER']),
     recent: chunithmSongs(20, 14.2, ['MASTER', 'ULTIMA']),
   },
   ongeki: {
     game: 'ongeki', playerName: 'ＭＯＣＫ', rating: 20.123, fetchedAt: NOW, toolVersion: 'mock',
-    best: ongekiSongs(50, 14.6, ['MASTER', 'EXPERT', 'MASTER', 'LUNATIC']),
+    best: ongekiSongs(50, 14.6, ['LUNATIC', 'MASTER', 'EXPERT', 'MASTER']),
     recent: ongekiSongs(10, 14.1, ['MASTER', 'EXPERT']),
     platinum: ongekiPlatinum(50, 14.5),
   },

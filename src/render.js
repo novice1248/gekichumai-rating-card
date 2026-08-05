@@ -1023,11 +1023,12 @@ async function drawGridSection(ctx, W, cols, y, game, data, { bestCount, showSco
 const DIFF_STYLE = {
   BASIC: { label: 'BAS', color: '#66bb6a' },
   ADVANCED: { label: 'ADV', color: '#ffa726' },
-  EXPERT: { label: 'EXP', color: '#ef5362' },
+  EXPERT: { label: 'EXP', color: '#ff7b7b' },
   MASTER: { label: 'MAS', color: '#ab7ee0' },
   'Re:MASTER': { label: 'Re:M', color: '#e6c9ff' },
-  // ULTIMAは黒地に赤の公式配色。EXPERTの赤と紛れないよう暗く濁らせて差をつける
-  ULTIMA: { label: 'ULT', color: '#b3173a' },
+  // ULTIMAは黒地に濃い赤の公式配色。EXPERTを明るい赤に寄せ、こちらは
+  // 彩度の高い深紅にして、暗い背景でも沈まずに区別できるようにする
+  ULTIMA: { label: 'ULT', color: '#e01235' },
   // オンゲキのLUNATICはmaimaiのRe:MASTERと同じ位置づけなので淡い紫に寄せる
   LUNATIC: { label: 'LUN', color: '#e6c9ff' },
 };
