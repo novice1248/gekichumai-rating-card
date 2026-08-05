@@ -277,9 +277,13 @@ window.__card = {
 
 // ブックマークレット登録UI（配布先ではこのページのオリジンからスクリプトを読み込む）
 {
+  // プレビュー配信のURLからコピーすると、そのデプロイに固定されて古い版を
+  // 読み込み続けるため、pages.dev上では常に本番オリジンを指す
+  const PROD_ORIGIN = 'https://gekichumai-card-3e325b.pages.dev';
+  const origin = location.hostname.endsWith('pages.dev') ? PROD_ORIGIN : location.origin;
   const loader =
     `javascript:(()=>{const s=document.createElement('script');` +
-    `s.src='${location.origin}/bookmarklets/gekichumai.js?t='+Date.now();` +
+    `s.src='${origin}/bookmarklets/gekichumai.js?t='+Date.now();` +
     `document.head.appendChild(s);})();`;
   // ドラッグ登録は最近のChromeで壊れる（JSがタイトルに入る）ため、コピー登録のみ提供
   document.getElementById('copy-bookmarklet').addEventListener('click', async () => {

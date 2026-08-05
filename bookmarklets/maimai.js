@@ -90,7 +90,8 @@
         s._img = r.img;
         const ach = Math.min(s.score, 100.5);
         const factor = (RANK_FACTORS.find(([min]) => ach >= min) ?? [0, 0])[1];
-        s.ratingValue = Math.floor(r.const * (ach / 100) * factor);
+        s._base = Math.floor(r.const * (ach / 100) * factor);
+        s.ratingValue = s._base;
       }
       list.sort((a, b) => (b.ratingValue ?? -1) - (a.ratingValue ?? -1));
     }
@@ -172,6 +173,12 @@
         hit++;
       }
     }
+    // CiRCLEでAP以上に+1のボーナスが入るため、マークが取れた曲だけ反映する
+    for (const s of [...buckets.new, ...buckets.best]) {
+      if (s._base != null && (s.comboMark === 'AP' || s.comboMark === 'AP+')) {
+        s.ratingValue = s._base + 1;
+      }
+    }
     console.log(`[maimai] マーク適用: ${hit}曲 / 収集${marks.size}件`);
   }
 
@@ -200,7 +207,7 @@
   }
   }
 
-  const strip = (l) => l.map(({ _dx, _img, _idx, ...s }) => s);
+  const strip = (l) => l.map(({ _dx, _img, _idx, _base, ...s }) => s);
   const out = {
     game: 'maimai',
     playerName,

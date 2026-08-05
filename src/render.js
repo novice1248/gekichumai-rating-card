@@ -15,6 +15,8 @@ const NUM_FONT = '"Helvetica Neue", "Arial", sans-serif';
 // 飾り（枠・バッジ）用の彩度高めの虹
 const RAINBOW = ['#ff4d6d', '#ffa94d', '#ffe14d', '#4dff88', '#4dc4ff', '#8d6bff', '#ff6bd6'];
 // 数字用のパステル虹（彩度を落として可読性を優先。縁取りとセットで使う）
+// 虹★5の見せ方: subtle=★と縁だけ / bold=タイル枠も虹 / max=枠＋外周の光＋きらめき
+let STAR_STYLE = 'max';
 const RAINBOW_SOFT = ['#ffb3c1', '#ffd9a8', '#fff3b0', '#c0f0cf', '#b8e2ff', '#d4c8ff', '#ffc2ea'];
 
 // ---------------------------------------------------------------- 共通素材
@@ -1063,14 +1065,53 @@ async function drawTile(ctx, x, y, w, game, meta, song, index, showScore, mode, 
   const diff = diffStyleOf(song.difficulty);
   const isPlatinum = mode === 'platinum';
 
-  // ジャケット＋難易度色の縁
+  // ジャケット＋難易度色の縁。虹★5は枠自体を虹にして特別扱いする
+  const rainbowTile = mode === 'platinum' && isRainbowStar(song) && STAR_STYLE !== 'subtle';
+  if (rainbowTile && STAR_STYLE === 'max') {
+    // 外周にうっすら虹の光を回す
+    ctx.save();
+    ctx.shadowColor = 'rgba(255,255,255,0.85)';
+    ctx.shadowBlur = 16;
+    roundRectPath(ctx, x - 2, y - 2, w + 4, w + 4, 7);
+    ctx.strokeStyle = rainbowGradient(ctx, x, y, w);
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.restore();
+  }
   await drawJacket(ctx, x, y, w, song, meta.themeColor);
   ctx.save();
   roundRectPath(ctx, x + 1, y + 1, w - 2, w - 2, 5);
-  ctx.strokeStyle = diff.color;
-  ctx.lineWidth = 2.5;
+  if (rainbowTile) {
+    ctx.strokeStyle = rainbowGradient(ctx, x, y, w);
+    ctx.lineWidth = 3.5;
+    ctx.shadowColor = 'rgba(255,255,255,0.6)';
+    ctx.shadowBlur = STAR_STYLE === 'max' ? 10 : 6;
+  } else {
+    ctx.strokeStyle = diff.color;
+    ctx.lineWidth = 2.5;
+  }
   ctx.stroke();
   ctx.restore();
+  if (rainbowTile && STAR_STYLE === 'max') {
+    // 四隅のきらめき
+    ctx.save();
+    ctx.fillStyle = '#ffffff';
+    ctx.shadowColor = '#ffffff';
+    ctx.shadowBlur = 8;
+    for (const [cx, cy, r] of [[x + 6, y + 6, 3.5], [x + w - 6, y + w - 6, 3], [x + w - 10, y + 10, 2]]) {
+      ctx.beginPath();
+      for (let i = 0; i < 8; i++) {
+        const a2 = (Math.PI / 4) * i;
+        const rr = i % 2 === 0 ? r : r * 0.35;
+        const px = cx + Math.cos(a2) * rr;
+        const py = cy + Math.sin(a2) * rr;
+        i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+  }
 
   // 順位チップ（ジャケット左上）
   ctx.save();
@@ -1096,10 +1137,16 @@ async function drawTile(ctx, x, y, w, game, meta, song, index, showScore, mode, 
     ctx.fillStyle = 'rgba(11,14,29,0.85)';
     ctx.fill();
     if (rainbowStar) {
+      if (STAR_STYLE !== 'subtle') {
+        ctx.globalAlpha = 0.25;
+        ctx.fillStyle = rainbowGradient(ctx, x + w - tw, y + 6, tw);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
       ctx.strokeStyle = rainbowGradient(ctx, x + w - tw, y + 6, tw);
-      ctx.lineWidth = 1.6;
-      ctx.shadowColor = 'rgba(255,255,255,0.7)';
-      ctx.shadowBlur = 8;
+      ctx.lineWidth = STAR_STYLE === 'max' ? 2.2 : 1.6;
+      ctx.shadowColor = 'rgba(255,255,255,0.75)';
+      ctx.shadowBlur = STAR_STYLE === 'max' ? 12 : 8;
       ctx.stroke();
     }
     ctx.restore();
@@ -1163,7 +1210,11 @@ async function drawTile(ctx, x, y, w, game, meta, song, index, showScore, mode, 
     ctx.fillStyle = 'rgba(255,255,255,0.5)';
     ctx.font = `600 12px ${NUM_FONT}`;
     ctx.textAlign = 'right';
-    ctx.fillText(formatScore(game, song.score), x + w, y + w + 29);
+    // プラチナは素点より達成率のほうが意味を読み取りやすい
+    const scoreText = isPlatinum && song.scoreMax
+      ? `${((song.score / song.scoreMax) * 100).toFixed(2)}%`
+      : formatScore(game, song.score);
+    ctx.fillText(scoreText, x + w, y + w + 29);
     ctx.textAlign = 'left';
   }
 }
@@ -1177,6 +1228,7 @@ async function drawTile(ctx, x, y, w, game, meta, song, index, showScore, mode, 
  *           showScore?: boolean }} [opts]
  */
 export async function renderCard(canvas, dataByGame, opts = {}) {
+  STAR_STYLE = opts.starStyle ?? 'max';
   const layout = opts.layout ?? 'summary';
   const showBest = opts.showBest ?? true;
   const bestCount = opts.bestCount ?? 5;

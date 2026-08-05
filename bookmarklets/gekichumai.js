@@ -7,6 +7,7 @@
 //  - maimaiのFC/APマーク（任意）: ジャンル別スコアページで実行すると収集される
 
 (async () => {
+  console.log('[grc] 取得スクリプト v0.3.0');
   // ローダー（script src注入）経由なら、読み込み元＝ツールのオリジンを特定し、
   // 完了時に画面へオーバーレイを出して「タップでツールを開いて送る」（ファイルレス）。
   // 開始時にwindow.openしない理由: ブックマークレット由来のopenはスマホSafariで
@@ -180,7 +181,8 @@
         s._img = r.img;
         const ach = Math.min(s.score, 100.5);
         const factor = (RANK_FACTORS.find(([min]) => ach >= min) ?? [0, 0])[1];
-        s.ratingValue = Math.floor(r.const * (ach / 100) * factor);
+        s._base = Math.floor(r.const * (ach / 100) * factor);
+        s.ratingValue = s._base;
       }
       list.sort((a, b) => (b.ratingValue ?? -1) - (a.ratingValue ?? -1));
     }
@@ -262,6 +264,12 @@
         hit++;
       }
     }
+    // CiRCLEでAP以上に+1のボーナスが入るため、マークが取れた曲だけ反映する
+    for (const s of [...buckets.new, ...buckets.best]) {
+      if (s._base != null && (s.comboMark === 'AP' || s.comboMark === 'AP+')) {
+        s.ratingValue = s._base + 1;
+      }
+    }
     console.log(`[maimai] マーク適用: ${hit}曲 / 収集${marks.size}件`);
   }
 
@@ -290,7 +298,7 @@
   }
   }
 
-  const strip = (l) => l.map(({ _dx, _img, _idx, ...s }) => s);
+  const strip = (l) => l.map(({ _dx, _img, _idx, _base, ...s }) => s);
   const out = {
     game: 'maimai',
     playerName,
@@ -484,6 +492,8 @@
       img.src = src;
     });
   let loggedSample = false;
+  // ランプのアイコン名はNET側の変更で変わりうるので、実際に出た名前を控えて出す
+  const lampIcons = new Set();
   const __jList = [...best, ...recent].filter((s) => s._idx && s._token);
   let __ji = 0;
   for (const s of [...best, ...recent]) {
@@ -499,6 +509,19 @@
         }).toString(),
       });
       const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
+      // 同じ詳細ページからクリアランプ（AJ/FC）も拾う。追加のリクエストは要らない
+      {
+        const srcs = [...doc.querySelectorAll('img')].map((i) => i.getAttribute('src') ?? '');
+        srcs.forEach((u) => {
+          const m = u.match(/icon_[a-z0-9_]+/);
+          if (m) lampIcons.add(m[0]);
+        });
+        const hit = (re) => srcs.some((u) => re.test(u));
+        s.comboMark = hit(/alljustice(critical)?/i) ? 'AJ'
+          : hit(/fullcombo|full_combo/i) ? 'FC' : null;
+        s.chainMark = hit(/fullchain2|fullchain_gold/i) ? 'FC2'
+          : hit(/fullchain/i) ? 'FC1' : null;
+      }
       // 詳細ページ内のジャケット: /mobile/img/ 配下でUI部品でない最初の画像
       const imgEl = [...doc.querySelectorAll('img')].find((i) => {
         const src = i.getAttribute('src') ?? '';
@@ -519,6 +542,7 @@
     await sleep(400);
   }
 
+  console.log('[chunithm] 詳細ページのアイコン:', [...lampIcons].sort().join(', ') || '(なし)');
   const strip = (l) => l.map(({ _idx, _img, _diff, _genre, _token, ...s }) => s);
   const out = {
     game: 'chunithm',
