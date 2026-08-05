@@ -111,6 +111,7 @@
     const DIFF_NO = { BASIC: 0, ADVANCED: 1, EXPERT: 2, MASTER: 3, 'Re:MASTER': 4 };
     const need = new Set([...buckets.new, ...buckets.best].map((s) => DIFF_NO[s.difficulty]));
     const marks = new Map();
+    const listed = new Set(); // 一覧に載っていた曲（マークの有無を問わず）
     const seenIcons = new Set();
     const readFrame = (url, pageDiff) =>
       new Promise((res) => {
@@ -139,9 +140,11 @@
                 : has('fcp') ? 'FC+' : has('fc') ? 'FC' : null;
               const syncMark = has('fsdp') ? 'FDX+' : has('fsd') ? 'FDX'
                 : has('fsp') ? 'FS+' : has('fs') ? 'FS' : null;
+              const listKey = `${normTitle(nameEl.textContent)}|${pageDiff}`;
+              listed.add(listKey);
               if (comboMark || syncMark) {
                 // 難易度は取得元ページのものが確実。曲名は表記ゆれを避けて正規化する
-                const key = `${normTitle(nameEl.textContent)}|${pageDiff}`;
+                const key = listKey;
                 marks.set(`${key}|${dx}`, { comboMark, syncMark });
                 if (!marks.has(key)) marks.set(key, { comboMark, syncMark });
                 n++;
@@ -167,6 +170,7 @@
     console.log('[maimai] スコア一覧のアイコン:', [...seenIcons].sort().join(', ') || '(なし)');
 
     let hit = 0;
+    let noMark = 0;
     const missed = [];
     for (const s of [...buckets.new, ...buckets.best]) {
       const base = `${normTitle(s.title)}|${DIFF_NO[s.difficulty]}`;
@@ -176,11 +180,14 @@
         s.comboMark = m.comboMark;
         s.syncMark = m.syncMark;
         hit++;
-      } else if (missed.length < 5) {
-        missed.push(base);
+      } else if (!listed.has(base)) {
+        missed.push(base); // 一覧自体に見つからない＝照合の問題
+      } else {
+        noMark++; // 一覧にはあるがマークが無い＝正常
       }
     }
-    if (missed.length) console.log('[maimai] 照合できなかった例:', missed);
+    console.log(`[maimai] マーク無し: ${noMark}曲 / 一覧に無い: ${missed.length}曲`);
+    if (missed.length) console.log('[maimai] 一覧に見つからない曲:', missed.slice(0, 10));
     // CiRCLEでAP以上に+1のボーナスが入るため、マークが取れた曲だけ反映する
     for (const s of [...buckets.new, ...buckets.best]) {
       if (s._base != null && (s.comboMark === 'AP' || s.comboMark === 'AP+')) {
