@@ -1,6 +1,7 @@
 import { renderCard } from './render.js';
 import { validateGameData, verifySignature } from './schema.js';
 import { MOCK_DATA } from './mock.js';
+import { GAME_META, recalcRating } from './tiers.js';
 
 const state = { maimai: null, chunithm: null, ongeki: null };
 const sigStates = { maimai: null, chunithm: null, ongeki: null };
@@ -55,6 +56,7 @@ async function idbClear() {
 
 const canvas = document.getElementById('card');
 const statusEl = document.getElementById('status');
+const diffEl = document.getElementById('rating-diff');
 
 // 同一オリジンのタブ間同期: どこかのタブが新データを保存したら、
 // 開きっぱなしの他のタブも自動で最新表示になる
@@ -128,6 +130,27 @@ async function rerender() {
     : loaded.length
       ? `読み込み済み: ${loaded.join(', ')}`
       : 'データ未読み込み（下の「初回セットアップ」からブックマークレットを登録して、各NETサイトで実行してください）';
+  showRatingDiff(mockOn);
+}
+
+// 枠から再計算したレーティングとNET表示の差を出す。差があるときは譜面定数DBが
+// ゲームのバージョンに未追従などの可能性があるので、その旨も添える
+function showRatingDiff(mockOn) {
+  diffEl.textContent = '';
+  if (mockOn) return;
+  const msgs = [];
+  for (const [game, data] of Object.entries(state)) {
+    if (!data) continue;
+    const r = recalcRating(game, data);
+    if (!r || Math.abs(r.diff) <= r.tolerance) continue;
+    const fmt = GAME_META[game].formatRating;
+    msgs.push(`${GAME_META[game].short}: 計算 ${fmt(r.calc)} / NET表示 ${fmt(data.rating)}`);
+  }
+  if (msgs.length === 0) return;
+  diffEl.textContent =
+    `⚠ 単曲レートの合計がNET表示と一致しません（${msgs.join('、')}）。` +
+    '譜面定数DBがゲームの最新バージョンに追いついていない可能性があります。' +
+    '画像にはNET表示の値を使っているため、カード自体は正しく出ています。';
 }
 
 document.getElementById('mock-toggle').addEventListener('change', rerender);

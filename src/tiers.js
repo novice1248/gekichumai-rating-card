@@ -88,6 +88,22 @@ export const GAME_META = {
 };
 
 /**
+ * 枠の単曲レートからレーティングを再計算する。NET表示との差は、譜面定数DBが
+ * ゲームのバージョンに追いついていない・マークが取得できていない等の兆候になる。
+ * @returns {{ calc: number, diff: number, tolerance: number } | null} 計算できなければnull
+ */
+export function recalcRating(game, data) {
+  const lists = [data.best, data.recent, data.platinum].filter(Array.isArray);
+  const values = lists.flat().map((s) => s.ratingValue);
+  if (values.length === 0 || values.some((v) => typeof v !== 'number')) return null;
+  const sum = values.reduce((a, b) => a + b, 0);
+  // maimaiは50譜面の合計そのもの、他機種は合計÷50（→ docs/specs.md）
+  const calc = game === 'maimai' ? sum : Math.floor((sum / 50) * 100) / 100;
+  const tolerance = game === 'maimai' ? 0 : 0.01;
+  return { calc, diff: Math.round((calc - data.rating) * 1000) / 1000, tolerance };
+}
+
+/**
  * ゲキチュ“ウマイ”度（3機種横断の総合指標）。
  * 出典: ゲキ！チュウマイ公式生放送（CHUNITHM X-VERSE稼働直前＆10周年記念）
  * https://www.youtube.com/watch?v=8crvpPjYIew
