@@ -175,31 +175,43 @@ async function renderBlob() {
   return { blob, ext: lite ? 'jpg' : 'png' };
 }
 
-// 画像だけのページを開く。スマホはファイル保存を経ずに長押しで写真へ保存できる
+// 画像を大きく表示する。新しいタブ（blob URL）だとiOSで「写真に追加」が
+// 出ないことがあるため、通常の<img>としてこのページ上に出す
 document.getElementById('open-image').addEventListener('click', async () => {
   const made = await renderBlob();
   if (!made) return;
-  const url = URL.createObjectURL(made.blob);
-  const w = window.open(url, '_blank');
-  if (!w) {
-    // ポップアップが塞がれている場合は同じタブ内に大きく表示する（長押しは同様に可能）
-    showImageInline(url);
+  // iOSはdata URLの方が長押し保存の互換性が高い。大きすぎる場合のみblob URLにする
+  let url;
+  if (made.blob.size < 8 * 1024 * 1024) {
+    url = await new Promise((r) => {
+      const fr = new FileReader();
+      fr.onload = () => r(fr.result);
+      fr.readAsDataURL(made.blob);
+    });
+  } else {
+    url = URL.createObjectURL(made.blob);
+    setTimeout(() => URL.revokeObjectURL(url), 300000);
   }
-  setTimeout(() => URL.revokeObjectURL(url), 120000);
+  showImageInline(url);
 });
 
 function showImageInline(url) {
+  document.querySelectorAll('.grc-image-overlay').forEach((d) => d.remove());
   const ov = document.createElement('div');
+  ov.className = 'grc-image-overlay';
   ov.style.cssText = 'position:fixed;inset:0;z-index:9999;background:#0e1220;overflow:auto;' +
-    'display:flex;flex-direction:column;align-items:center;gap:12px;padding:16px;';
+    '-webkit-overflow-scrolling:touch;display:flex;flex-direction:column;align-items:center;' +
+    'gap:12px;padding:16px;';
   const note = document.createElement('p');
-  note.textContent = '画像を長押しして保存してください';
-  note.style.cssText = 'color:#aab1c6;font-size:14px;margin:0;';
+  note.textContent = '画像を長押し →「写真に追加」で保存できます';
+  note.style.cssText = 'color:#aab1c6;font-size:14px;margin:0;text-align:center;';
   const img = document.createElement('img');
   img.src = url;
   img.style.cssText = 'max-width:100%;height:auto;border-radius:8px;';
   const close = document.createElement('button');
   close.textContent = '閉じる';
+  close.style.cssText = 'background:#2b3350;color:#e8ebf2;border:1px solid #3d4670;' +
+    'border-radius:8px;padding:10px 24px;font-size:14px;';
   close.onclick = () => ov.remove();
   ov.append(note, img, close);
   document.body.appendChild(ov);
