@@ -87,6 +87,42 @@ export const GAME_META = {
   },
 };
 
+/**
+ * 枠ごとの平均単曲レートと、その平均を出すのに必要な譜面定数の目安。
+ * 「目安の定数」は各機種の基準プレイを仮定して逆算する:
+ *   maimai   = SSS+（達成率100.5%・係数22.4）
+ *   CHUNITHM = SSS（1,007,500点、定数+2.00）
+ *   オンゲキ  = 1,007,500点＋AB＋FB（定数+1.75＋スコア0.30＋AB0.30＋FB0.05）
+ *   オンゲキP = ☆5（PSレート = 5×定数²÷1000）
+ */
+const REQUIRED_CONST = {
+  maimai: (avg) => avg / (1.005 * 22.4),
+  chunithm: (avg) => avg - 2.0,
+  ongeki: (avg) => avg - 2.4,
+  platinum: (avg) => Math.sqrt((avg * 1000) / 5),
+};
+
+/**
+ * @returns {{ key: string, label: string, avg: number, reqConst: number }[]}
+ */
+export function frameStats(game, data) {
+  const groups = [
+    { key: 'best', label: 'BEST', songs: data.best },
+    { key: 'recent', label: 'NEW', songs: data.recent },
+    { key: 'platinum', label: 'P', songs: data.platinum },
+  ];
+  const out = [];
+  for (const g of groups) {
+    if (!Array.isArray(g.songs) || g.songs.length === 0) continue;
+    const vals = g.songs.map((s) => s.ratingValue).filter((v) => typeof v === 'number');
+    if (vals.length === 0) continue;
+    const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
+    const req = (g.key === 'platinum' ? REQUIRED_CONST.platinum : REQUIRED_CONST[game])(avg);
+    out.push({ key: g.key, label: g.label, avg, reqConst: req });
+  }
+  return out;
+}
+
 /** 単曲レート値の表示。桁数を機種ごとに固定して、縦に並べたとき右端が揃うようにする */
 export function formatSongRating(game, v) {
   if (typeof v !== 'number') return '-';
