@@ -659,36 +659,41 @@ function drawFrameStats(ctx, x, y, game, data, align = 'left') {
   const stats = frameStats(game, data);
   if (stats.length === 0) return;
   const digits = game === 'ongeki' ? 3 : game === 'chunithm' ? 2 : 0;
+  const LABEL_FONT = `700 11px ${FONT}`;
+  const NUM = `700 14px ${NUM_FONT}`;
+  const NOTE_FONT = `600 11px ${FONT}`;
+  // 平均値であることが一目で分かるようラベルに「平均」を入れ、
+  // 定数の目安も「相当」と書く。列幅は実測して3行を揃える
+  const rows = stats.map((s) => ({
+    label: `${s.label} 平均`,
+    avg: s.key === 'platinum' ? s.avg.toFixed(3) : s.avg.toFixed(digits),
+    note: s.reqConst > 0 ? `${s.basis}で定数${s.reqConst.toFixed(1)}` : '',
+  }));
   ctx.save();
   ctx.textBaseline = 'top';
-  stats.forEach((s, i) => {
-    const ly = y + i * 17;
-    const avg = s.key === 'platinum' ? s.avg.toFixed(3) : s.avg.toFixed(digits);
-    const req = s.reqConst > 0 ? `≒定数 ${s.reqConst.toFixed(1)}` : '';
-    ctx.textAlign = align === 'right' ? 'right' : 'left';
-    const lx = align === 'right' ? x : x;
+  ctx.font = LABEL_FONT;
+  const labelW = Math.max(...rows.map((r) => ctx.measureText(r.label).width));
+  ctx.font = NOTE_FONT;
+  const noteW = Math.max(...rows.map((r) => ctx.measureText(r.note).width));
+  ctx.font = NUM;
+  const avgW = Math.max(...rows.map((r) => ctx.measureText(r.avg).width));
+  const GAP = 10;
+  const totalW = labelW + GAP + avgW + GAP + noteW;
+  const left = align === 'right' ? x - totalW : x;
+  rows.forEach((r, i) => {
+    const ly = y + i * 18;
+    ctx.textAlign = 'left';
+    ctx.fillStyle = 'rgba(255,255,255,0.42)';
+    ctx.font = LABEL_FONT;
+    ctx.fillText(r.label, left, ly + 2);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = 'rgba(255,255,255,0.82)';
+    ctx.font = NUM;
+    ctx.fillText(r.avg, left + labelW + GAP + avgW, ly);
+    ctx.textAlign = 'left';
     ctx.fillStyle = 'rgba(255,255,255,0.32)';
-    ctx.font = `700 11px ${FONT}`;
-    if (align === 'right') {
-      ctx.fillText(req, lx, ly + 1);
-      ctx.fillStyle = 'rgba(255,255,255,0.62)';
-      ctx.font = `700 13px ${NUM_FONT}`;
-      const reqW = 78;
-      ctx.fillText(avg, lx - reqW, ly);
-      ctx.fillStyle = 'rgba(255,255,255,0.32)';
-      ctx.font = `700 11px ${FONT}`;
-      ctx.fillText(s.label, lx - reqW - 54, ly + 1);
-    } else {
-      ctx.fillText(s.label, lx, ly + 1);
-      ctx.fillStyle = 'rgba(255,255,255,0.62)';
-      ctx.font = `700 13px ${NUM_FONT}`;
-      ctx.textAlign = 'right';
-      ctx.fillText(avg, lx + 96, ly);
-      ctx.textAlign = 'left';
-      ctx.fillStyle = 'rgba(255,255,255,0.32)';
-      ctx.font = `700 11px ${FONT}`;
-      ctx.fillText(req, lx + 104, ly + 1);
-    }
+    ctx.font = NOTE_FONT;
+    ctx.fillText(r.note, left + labelW + GAP + avgW + GAP, ly + 2);
   });
   ctx.textAlign = 'left';
   ctx.restore();

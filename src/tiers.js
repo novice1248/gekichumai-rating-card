@@ -97,10 +97,10 @@ export const GAME_META = {
  *   オンゲキP = ☆5（PSレート = 5×定数²÷1000）
  */
 const REQUIRED_CONST = {
-  maimai: (avg) => avg / (1.005 * 22.4),
-  chunithm: (avg) => avg - 2.0,
-  ongeki: (avg) => avg - 2.4,
-  platinum: (avg) => Math.sqrt((avg * 1000) / 5),
+  maimai: { calc: (avg) => avg / (1.005 * 22.4), basis: 'SSS+' },
+  chunithm: { calc: (avg) => avg - 2.0, basis: 'SSS' },
+  ongeki: { calc: (avg) => avg - 2.4, basis: 'SSS+ FB AB' },
+  platinum: { calc: (avg) => Math.sqrt((avg * 1000) / 5), basis: '★5' },
 };
 
 /**
@@ -118,8 +118,8 @@ export function frameStats(game, data) {
     const vals = g.songs.map((s) => s.ratingValue).filter((v) => typeof v === 'number');
     if (vals.length === 0) continue;
     const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
-    const req = (g.key === 'platinum' ? REQUIRED_CONST.platinum : REQUIRED_CONST[game])(avg);
-    out.push({ key: g.key, label: g.label, avg, reqConst: req });
+    const conv = g.key === 'platinum' ? REQUIRED_CONST.platinum : REQUIRED_CONST[game];
+    out.push({ key: g.key, label: g.label, avg, reqConst: conv.calc(avg), basis: conv.basis });
   }
   return out;
 }
