@@ -190,6 +190,10 @@
     console.warn('[maimai] 定数DB取得失敗（レベル・単曲レートなしで続行）:', e.message);
   }
 
+  // 曲名は一覧とレーティング対象曲ページで表記が微妙に違うことがあるため正規化する
+  const normTitle = (s) =>
+    (s ?? '').normalize('NFKC').replace(/\s+/g, ' ').trim().toLowerCase();
+
   // ---- FC/AP・SYNCマーク ----
   // マークは対象曲ページに無く、fetchは全経路/error/へリダイレクトされる。
   // ただし同一オリジンの隠しiframeはページ遷移として扱われて読めるため、
@@ -199,7 +203,7 @@
     const need = new Set([...buckets.new, ...buckets.best].map((s) => DIFF_NO[s.difficulty]));
     const marks = new Map();
     const seenIcons = new Set();
-    const readFrame = (url) =>
+    const readFrame = (url, pageDiff) =>
       new Promise((res) => {
         const f = document.createElement('iframe');
         f.style.cssText = 'position:fixed;left:-9999px;top:0;width:1px;height:1px;opacity:0;';
@@ -221,18 +225,16 @@
                 if (m) seenIcons.add(m[0]);
               });
               const has = (x) => icons.some((u) => u.includes(`music_icon_${x}.`));
-              const cls = row.className + ' ' + (row.parentElement?.className ?? '');
-              const diffSrc = icons.find((s) => /diff_[a-z]+\.png/.test(s)) ?? '';
-              const dtext = cls + ' ' + diffSrc;
-              const dno = /remaster/.test(dtext) ? 4 : /master/.test(dtext) ? 3
-                : /expert/.test(dtext) ? 2 : /advanced/.test(dtext) ? 1 : 0;
               const dx = icons.some((u) => u.includes('music_dx')) ? 1 : 0;
               const comboMark = has('app') ? 'AP+' : has('ap') ? 'AP'
                 : has('fcp') ? 'FC+' : has('fc') ? 'FC' : null;
               const syncMark = has('fsdp') ? 'FDX+' : has('fsd') ? 'FDX'
                 : has('fsp') ? 'FS+' : has('fs') ? 'FS' : null;
               if (comboMark || syncMark) {
-                marks.set(`${nameEl.textContent.trim()}|${dno}|${dx}`, { comboMark, syncMark });
+                // 難易度は取得元ページのものが確実。曲名は表記ゆれを避けて正規化する
+                const key = `${normTitle(nameEl.textContent)}|${pageDiff}`;
+                marks.set(`${key}|${dx}`, { comboMark, syncMark });
+                if (!marks.has(key)) marks.set(key, { comboMark, syncMark });
                 n++;
               }
             }
@@ -249,21 +251,27 @@
     for (const dno of [...need].sort()) {
       window.__grcProgress?.(`マーク取得中… 難易度${dno + 1}/${need.size}`);
       const n = await readFrame(
-        `${location.origin}/maimai-mobile/record/musicGenre/search/?genre=99&diff=${dno}`);
+        `${location.origin}/maimai-mobile/record/musicGenre/search/?genre=99&diff=${dno}`, dno);
       console.log(`[maimai] 難易度${dno}: マーク${n}件`);
       await sleep(1200);
     }
     console.log('[maimai] スコア一覧のアイコン:', [...seenIcons].sort().join(', ') || '(なし)');
 
     let hit = 0;
+    const missed = [];
     for (const s of [...buckets.new, ...buckets.best]) {
-      const m = marks.get(`${s.title}|${DIFF_NO[s.difficulty]}|${s._dx ? 1 : 0}`);
+      const base = `${normTitle(s.title)}|${DIFF_NO[s.difficulty]}`;
+      // DX/STDの区別が一覧側に無いこともあるので、無印キーへフォールバックする
+      const m = marks.get(`${base}|${s._dx ? 1 : 0}`) ?? marks.get(base);
       if (m) {
         s.comboMark = m.comboMark;
         s.syncMark = m.syncMark;
         hit++;
+      } else if (missed.length < 5) {
+        missed.push(base);
       }
     }
+    if (missed.length) console.log('[maimai] 照合できなかった例:', missed);
     // CiRCLEでAP以上に+1のボーナスが入るため、マークが取れた曲だけ反映する
     for (const s of [...buckets.new, ...buckets.best]) {
       if (s._base != null && (s.comboMark === 'AP' || s.comboMark === 'AP+')) {

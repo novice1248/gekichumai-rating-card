@@ -826,28 +826,34 @@ function drawSummaryColumn(ctx, x, y, w, h, game, data, { showBest, bestCount, s
       // 難易度色のバー
       ctx.fillStyle = diffStyleOf(s.difficulty).color;
       ctx.fillRect(x + 48, ry + 1, 4, 13);
-      ctx.fillStyle = 'rgba(255,255,255,0.92)';
-      ctx.font = `600 14px ${FONT}`;
-      ctx.fillText(truncate(ctx, s.title, w - 168), x + 60, ry + 1);
-      ctx.textAlign = 'right';
-      // 譜面定数（難易度色・小さめ）→ 単曲レート値。
       // チェックサムが合わないデータは整数Lv・レート値なしに格下げ（課金機能の
       // 「定数×リザルト」を検証できないデータに与えないため → docs/specs.md）
       const degraded = sigState === 'missing' || sigState === 'invalid';
-      // レート値（右端）→ その左に定数、と右から詰めて重なりを防ぐ
       const rvText = !degraded && s.ratingValue != null
         ? formatSongRating(game, s.ratingValue) + (s.constUnknown ? '?' : '')
         : '-';
+      const constText = !s.level ? '' : degraded
+        ? String(Math.floor(s.level))
+        : (s.level.toFixed ? s.level.toFixed(1) : String(s.level)) + (s.constUnknown ? '?' : '');
+      // 右側（定数・レート値）の実寸を先に測り、残り全部を曲名に使う。
+      // 固定幅で見積もると、入るはずの曲名まで省略されてしまう
+      ctx.font = `700 14px ${NUM_FONT}`;
+      const rvW = ctx.measureText(rvText).width;
+      ctx.font = `700 12px ${NUM_FONT}`;
+      const constW = constText ? ctx.measureText(constText).width + 12 : 0;
+      const titleMaxW = w - 22 - rvW - constW - 12 - 60;
+
+      ctx.fillStyle = 'rgba(255,255,255,0.92)';
+      ctx.font = `600 14px ${FONT}`;
+      ctx.fillText(truncate(ctx, s.title, titleMaxW), x + 60, ry + 1);
+
+      ctx.textAlign = 'right';
       ctx.fillStyle = 'rgba(255,255,255,0.55)';
       ctx.font = `700 14px ${NUM_FONT}`;
       ctx.fillText(rvText, x + w - 22, ry + 1);
-      const rvW = ctx.measureText(rvText).width;
-      if (s.level) {
+      if (constText) {
         ctx.fillStyle = hexA(diffStyleOf(s.difficulty).color, 0.85);
         ctx.font = `700 12px ${NUM_FONT}`;
-        const constText = degraded
-          ? String(Math.floor(s.level))
-          : (s.level.toFixed ? s.level.toFixed(1) : String(s.level)) + (s.constUnknown ? '?' : '');
         ctx.fillText(constText, x + w - 22 - rvW - 12, ry + 3);
       }
       ctx.textAlign = 'left';
