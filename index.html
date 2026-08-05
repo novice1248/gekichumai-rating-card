@@ -27,6 +27,11 @@
     #file-input { display: none; }
     .opt { font-size: 14px; color: #aab1c6; display: flex; gap: 6px; align-items: center; }
     #status { font-size: 13px; color: #8b93ab; margin-bottom: 12px; }
+    #rating-diff:not(:empty) {
+      font-size: 13px; color: #c9a35f; line-height: 1.7;
+      border-left: 3px solid #c9a35f; padding: 8px 12px; margin-bottom: 12px;
+      background: rgba(201,163,95,0.08); border-radius: 0 6px 6px 0;
+    }
     canvas { border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
   </style>
 </head>
@@ -71,6 +76,7 @@
       </span>
     </div>
     <div id="status"></div>
+    <div id="rating-diff"></div>
     <details style="margin-bottom:14px;">
       <summary style="cursor:pointer;color:#aab1c6;font-size:14px;">初回セットアップ（ブックマークレット）・手動読み込み</summary>
       <div style="font-size:13px;color:#aab1c6;line-height:1.9;padding:10px 4px;">
