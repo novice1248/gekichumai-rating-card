@@ -4,7 +4,7 @@
 //   - grid:    ジャケット主体のタイルグリッド型（縦長・機種ごとのセクション）
 // ジャケットURLが無い曲は曲名から生成する疑似ジャケットで埋める。
 
-import { GAME_META, tierOf, gekichumaiPower, formatSongRating, frameStats } from './tiers.js';
+import { GAME_META, tierOf, gekichumaiPower, formatSongRating, frameStats, isRainbowStar } from './tiers.js';
 import { rankOf, rankColor, formatScore } from './rank.js';
 
 export const CARD_W = 1200;
@@ -554,8 +554,8 @@ function drawHeader(ctx, W, dataByGame, nameOverride) {
   const power = gekichumaiPower(dataByGame);
   const panelW = 372;
   const panelX = W - 36 - panelW;
-  const panelY = 18;
-  const panelH = 84;
+  const panelY = 10;
+  const panelH = 100;
 
   // 斜めパネル（虹の縁光り）
   ctx.save();
@@ -576,22 +576,23 @@ function drawHeader(ctx, W, dataByGame, nameOverride) {
   // ラベル行: 和文＋欧文の二段構え
   ctx.fillStyle = 'rgba(255,255,255,0.85)';
   ctx.font = `800 15px ${FONT}`;
-  ctx.fillText('ゲキチュ“ウマイ”度', panelX + 30, panelY + 12);
+  ctx.fillText('ゲキチュ“ウマイ”度', panelX + 30, panelY + 10);
   ctx.fillStyle = 'rgba(255,255,255,0.32)';
   ctx.font = `700 9px ${FONT}`;
-  drawTracked(ctx, 'GEKICHUMAI POWER', panelX + 31, panelY + 32, 2.2);
+  drawTracked(ctx, 'GEKICHUMAI POWER', panelX + 31, panelY + 30, 2.2);
 
   if (power) {
     // 本体数字: ヘッダーで最大の要素にする。ランク到達時はランク色（虹/鉑/金/銀）
     const numColor = power.rank ? (power.rankColor ?? null) : '#f0f2ff';
-    ctx.font = `italic 800 44px ${NUM_FONT}`;
+    ctx.font = `italic 800 40px ${NUM_FONT}`;
     const vw = ctx.measureText(String(power.value)).width;
-    drawRatingText(ctx, String(power.value), panelX + panelW - vw - 26, panelY + 26, 44, numColor);
+    drawRatingText(ctx, String(power.value), panelX + panelW - vw - 26, panelY + 16, 40, numColor);
+    drawPowerBreakdown(ctx, panelX + 26, panelY + 62, panelW - 52, power);
     if (power.rank) {
       // ランク名は箱なしでダイヤ＋テキスト（虹バッジ廃止方針に合わせる）
       const isRainbow = power.rankColor === null;
       ctx.save();
-      ctx.translate(panelX + 36, panelY + 56);
+      ctx.translate(panelX + 36, panelY + 46);
       ctx.rotate(Math.PI / 4);
       ctx.shadowColor = isRainbow ? '#ffffff' : power.rankColor;
       ctx.shadowBlur = 8;
@@ -600,7 +601,7 @@ function drawHeader(ctx, W, dataByGame, nameOverride) {
       ctx.restore();
       ctx.fillStyle = 'rgba(255,255,255,0.92)';
       ctx.font = `800 15px ${FONT}`;
-      ctx.fillText(power.rank, panelX + 48, panelY + 48);
+      ctx.fillText(power.rank, panelX + 48, panelY + 38);
     }
   } else {
     ctx.fillStyle = 'rgba(255,255,255,0.35)';
@@ -614,7 +615,7 @@ function drawHeader(ctx, W, dataByGame, nameOverride) {
   ctx.fillStyle = 'rgba(255,255,255,0.4)';
   ctx.font = `600 13px ${NUM_FONT}`;
   ctx.textAlign = 'right';
-  ctx.fillText(dateStr, W - 44, panelY + panelH + 8);
+  ctx.fillText(dateStr, panelX - 24, panelY + 72);
   ctx.textAlign = 'left';
 }
 
@@ -658,38 +659,78 @@ function drawFrameStats(ctx, x, y, game, data, align = 'left') {
   const stats = frameStats(game, data);
   if (stats.length === 0) return;
   const digits = game === 'ongeki' ? 3 : game === 'chunithm' ? 2 : 0;
+  const LABEL_FONT = `700 11px ${FONT}`;
+  const NUM = `700 14px ${NUM_FONT}`;
+  const NOTE_FONT = `600 11px ${FONT}`;
+  // 平均値であることが一目で分かるようラベルに「平均」を入れ、
+  // 定数の目安も「相当」と書く。列幅は実測して3行を揃える
+  const rows = stats.map((s) => ({
+    label: `${s.label} 平均`,
+    avg: s.key === 'platinum' ? s.avg.toFixed(3) : s.avg.toFixed(digits),
+    note: s.reqConst > 0 ? `${s.basis}で定数${s.reqConst.toFixed(1)}` : '',
+  }));
   ctx.save();
   ctx.textBaseline = 'top';
-  stats.forEach((s, i) => {
-    const ly = y + i * 17;
-    const avg = s.key === 'platinum' ? s.avg.toFixed(3) : s.avg.toFixed(digits);
-    const req = s.reqConst > 0 ? `≒定数 ${s.reqConst.toFixed(1)}` : '';
-    ctx.textAlign = align === 'right' ? 'right' : 'left';
-    const lx = align === 'right' ? x : x;
+  ctx.font = LABEL_FONT;
+  const labelW = Math.max(...rows.map((r) => ctx.measureText(r.label).width));
+  ctx.font = NOTE_FONT;
+  const noteW = Math.max(...rows.map((r) => ctx.measureText(r.note).width));
+  ctx.font = NUM;
+  const avgW = Math.max(...rows.map((r) => ctx.measureText(r.avg).width));
+  const GAP = 10;
+  const totalW = labelW + GAP + avgW + GAP + noteW;
+  const left = align === 'right' ? x - totalW : x;
+  rows.forEach((r, i) => {
+    const ly = y + i * 18;
+    ctx.textAlign = 'left';
+    ctx.fillStyle = 'rgba(255,255,255,0.42)';
+    ctx.font = LABEL_FONT;
+    ctx.fillText(r.label, left, ly + 2);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = 'rgba(255,255,255,0.82)';
+    ctx.font = NUM;
+    ctx.fillText(r.avg, left + labelW + GAP + avgW, ly);
+    ctx.textAlign = 'left';
     ctx.fillStyle = 'rgba(255,255,255,0.32)';
-    ctx.font = `700 11px ${FONT}`;
-    if (align === 'right') {
-      ctx.fillText(req, lx, ly + 1);
-      ctx.fillStyle = 'rgba(255,255,255,0.62)';
-      ctx.font = `700 13px ${NUM_FONT}`;
-      const reqW = 78;
-      ctx.fillText(avg, lx - reqW, ly);
-      ctx.fillStyle = 'rgba(255,255,255,0.32)';
-      ctx.font = `700 11px ${FONT}`;
-      ctx.fillText(s.label, lx - reqW - 54, ly + 1);
-    } else {
-      ctx.fillText(s.label, lx, ly + 1);
-      ctx.fillStyle = 'rgba(255,255,255,0.62)';
-      ctx.font = `700 13px ${NUM_FONT}`;
-      ctx.textAlign = 'right';
-      ctx.fillText(avg, lx + 96, ly);
-      ctx.textAlign = 'left';
-      ctx.fillStyle = 'rgba(255,255,255,0.32)';
-      ctx.font = `700 11px ${FONT}`;
-      ctx.fillText(req, lx + 104, ly + 1);
-    }
+    ctx.font = NOTE_FONT;
+    ctx.fillText(r.note, left + labelW + GAP + avgW + GAP, ly + 2);
   });
   ctx.textAlign = 'left';
+  ctx.restore();
+}
+
+/** ゲキチュウマイ度の内訳。機種色の積み上げバーと式で、どの機種がどれだけ
+ *  寄与しているかを見せる */
+function drawPowerBreakdown(ctx, x, y, w, power) {
+  const total = power.parts.reduce((a, p) => a + p.value, 0);
+  if (total <= 0) return;
+  ctx.save();
+  ctx.textBaseline = 'top';
+  let bx = x;
+  power.parts.forEach((p, i) => {
+    const pw = (w * p.value) / total;
+    ctx.fillStyle = GAME_META[p.game].themeColor;
+    ctx.fillRect(bx, y, i === power.parts.length - 1 ? x + w - bx : pw - 2, 5);
+    bx += pw;
+  });
+  let tx = x;
+  power.parts.forEach((p, i) => {
+    ctx.font = `700 11px ${FONT}`;
+    if (i > 0) {
+      ctx.fillStyle = 'rgba(255,255,255,0.35)';
+      ctx.fillText('＋', tx, y + 13);
+      tx += ctx.measureText('＋').width + 1;
+    }
+    ctx.fillStyle = hexA(GAME_META[p.game].themeColor, 0.95);
+    const label = `${GAME_META[p.game].short} `;
+    ctx.fillText(label, tx, y + 13);
+    tx += ctx.measureText(label).width;
+    ctx.fillStyle = 'rgba(255,255,255,0.72)';
+    ctx.font = `700 12px ${NUM_FONT}`;
+    const num = p.value.toLocaleString('en-US');
+    ctx.fillText(num, tx, y + 12);
+    tx += ctx.measureText(num).width + 3;
+  });
   ctx.restore();
 }
 
@@ -1043,9 +1084,10 @@ async function drawTile(ctx, x, y, w, game, meta, song, index, showScore, mode, 
 
   // ランクチップ（ジャケット右上）。プラチナ枠は☆数を出す
   {
+    const rainbowStar = isPlatinum && isRainbowStar(song);
     const label = isPlatinum ? `★${song.stars ?? 0}` : rankOf(game, song.score);
     const rc = isPlatinum
-      ? (song.stars >= 5 ? null : '#ffe9a3')
+      ? (rainbowStar ? null : song.stars >= 5 ? '#ffd54f' : '#ffe9a3')
       : rankColor(rankOf(game, song.score));
     ctx.font = `italic 800 13px ${NUM_FONT}`;
     const tw = ctx.measureText(label).width + 16;
@@ -1053,6 +1095,13 @@ async function drawTile(ctx, x, y, w, game, meta, song, index, showScore, mode, 
     paraPath(ctx, x + w - tw + 2, y + 6, tw, 20, 5);
     ctx.fillStyle = 'rgba(11,14,29,0.85)';
     ctx.fill();
+    if (rainbowStar) {
+      ctx.strokeStyle = rainbowGradient(ctx, x + w - tw, y + 6, tw);
+      ctx.lineWidth = 1.6;
+      ctx.shadowColor = 'rgba(255,255,255,0.7)';
+      ctx.shadowBlur = 8;
+      ctx.stroke();
+    }
     ctx.restore();
     ctx.fillStyle = rc === null ? rainbowGradient(ctx, x + w - tw, y + 6, tw, RAINBOW_SOFT) : rc;
     ctx.font = `italic 800 13px ${NUM_FONT}`;
