@@ -87,6 +87,12 @@ export const GAME_META = {
   },
 };
 
+/** 単曲レート値の表示。桁数を機種ごとに固定して、縦に並べたとき右端が揃うようにする */
+export function formatSongRating(game, v) {
+  if (typeof v !== 'number') return '-';
+  return game === 'maimai' ? String(Math.trunc(v)) : v.toFixed(game === 'ongeki' ? 3 : 2);
+}
+
 /**
  * 枠の単曲レートからレーティングを再計算する。NET表示との差は、譜面定数DBが
  * ゲームのバージョンに追いついていない・マークが取得できていない等の兆候になる。

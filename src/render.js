@@ -4,7 +4,7 @@
 //   - grid:    ジャケット主体のタイルグリッド型（縦長・機種ごとのセクション）
 // ジャケットURLが無い曲は曲名から生成する疑似ジャケットで埋める。
 
-import { GAME_META, tierOf, gekichumaiPower } from './tiers.js';
+import { GAME_META, tierOf, gekichumaiPower, formatSongRating } from './tiers.js';
 import { rankOf, rankColor, formatScore } from './rank.js';
 
 export const CARD_W = 1200;
@@ -747,7 +747,7 @@ function drawSummaryColumn(ctx, x, y, w, h, game, data, { showBest, bestCount, s
       const degraded = sigState === 'missing' || sigState === 'invalid';
       // レート値（右端）→ その左に定数、と右から詰めて重なりを防ぐ
       const rvText = !degraded && s.ratingValue != null
-        ? String(s.ratingValue) + (s.constUnknown ? '?' : '')
+        ? formatSongRating(game, s.ratingValue) + (s.constUnknown ? '?' : '')
         : '-';
       ctx.fillStyle = 'rgba(255,255,255,0.55)';
       ctx.font = `700 14px ${NUM_FONT}`;
@@ -1021,7 +1021,7 @@ async function drawTile(ctx, x, y, w, game, meta, song, index, showScore, mode, 
 
   // レート値（ジャケット右下に重ねる）。格下げ時は出さない。定数未確定は「?」付き
   if (!degraded && song.ratingValue != null) {
-    const t = String(song.ratingValue) + (song.constUnknown ? '?' : '');
+    const t = formatSongRating(game, song.ratingValue) + (song.constUnknown ? '?' : '');
     ctx.font = `italic 800 16px ${NUM_FONT}`;
     const tw = ctx.measureText(t).width + 18;
     ctx.save();
