@@ -554,6 +554,8 @@
   // ---- セクション（見出し画像）ごとに曲ブロックを回収 ----
   // bestnew=新曲枠 / best=ベスト枠 / new_platinum=プラチナ枠 / new_next_*=候補（スキップ）
   const buckets = { recent: [], best: [], platinum: [] };
+  // NET側のアイコン名が変わるとマークが取れなくなるため、実際に出た名前を控えて出す
+  const seenIcons = new Set();
   let section = null;
   const nodes = document.querySelectorAll('img[src*="title_ratingmusic"], [class*="_score_back"]');
   for (const el of nodes) {
@@ -573,9 +575,12 @@
       : /expert/.test(cls) ? 'EXPERT'
       : /advanced/.test(cls) ? 'ADVANCED' : 'BASIC';
     const lvText = el.querySelector('.score_level')?.textContent.trim() ?? '0';
-    // マークアイコン（FB・クリアマーク）。music_icon_ab. は abp との誤マッチ防止でドット付き判定
+    // マークアイコン（FB・クリアマーク）。拡張子直前まで見て AB と AB+ を区別する。
+    // 「+」の綴りはサイト内で揺れがある（スコアランクは sssplus）ため複数形を許容する
     const icons = [...el.querySelectorAll('img[src*="music_icon"]')].map((i) => i.src);
-    const has = (name) => icons.some((s) => s.includes(`music_icon_${name}.`));
+    icons.forEach((s) => seenIcons.add((s.match(/music_icon_[a-z0-9_]+/) ?? [''])[0]));
+    const hasIcon = (re) => icons.some((s) => re.test(s));
+    const has = (name) => hasIcon(new RegExp(`music_icon_${name}\\.`));
     const song = {
       title: el.querySelector('.music_label')?.textContent.trim() ?? '',
       difficulty,
@@ -585,7 +590,8 @@
       ratingValue: null,
       jacketUrl: null,
       fullBell: has('fb'),
-      clearMark: has('abp') ? 'AB+' : has('ab') ? 'AB' : has('fc') ? 'FC' : null,
+      clearMark: hasIcon(/music_icon_ab(?:p|plus|_plus)\./) ? 'AB+'
+        : has('ab') ? 'AB' : has('fc') ? 'FC' : null,
     };
     if (section === 'platinum') {
       // PLATINUM HIGH SCORE: ☆数と「2,919 / 2,998」形式のスコア
@@ -601,6 +607,7 @@
     buckets[section].push(song);
   }
   window.__grcProgress?.(`曲データ回収完了（ベスト${buckets.best.length}・新曲${buckets.recent.length}・プラチナ${buckets.platinum.length}）`);
+  console.log('[ongeki] マークアイコン:', [...seenIcons].sort().join(', '));
   console.log('[ongeki] 回収:', Object.fromEntries(Object.entries(buckets).map(([k, v]) => [k, v.length])));
 
   // ---- 定数DB補完＋曲別TSレート計算 ----
