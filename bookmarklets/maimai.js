@@ -7,32 +7,50 @@
 
 (async () => {
   const VERSION = '0.2.0';
-  // ジャンル別スコアページ上ならマーク収集モード（FC/APマーク用）。
+  // レーティング対象曲ページ以外ならマーク収集モード（FC/AP・SYNC用）。
   // fetchは全経路/error/へリダイレクトされるため、マークは表示中のページの
-  // DOMから拾ってlocalStorageに貯め、レーティング対象曲ページでの実行時に合流させる。
-  if (location.pathname.includes('/record/musicGenre')) {
-    const store = JSON.parse(localStorage.getItem('grc-marks') ?? '{}');
-    let n = 0;
-    for (const row of document.querySelectorAll('[class*="_score_back"]')) {
-      const title = row.querySelector('.music_name_block')?.textContent.trim();
-      if (!title) continue;
-      const cls = row.className;
-      const diffNo = /remaster/.test(cls) ? 4 : /master/.test(cls) ? 3
-        : /expert/.test(cls) ? 2 : /advanced/.test(cls) ? 1 : 0;
-      const icons = [...row.querySelectorAll('img')].map((i) => i.getAttribute('src') ?? '');
-      const has = (x) => icons.some((u) => u.includes(`music_icon_${x}.`));
-      const dx = icons.some((u) => u.includes('music_dx')) ? 1 : 0;
-      const comboMark = has('app') ? 'AP+' : has('ap') ? 'AP' : has('fcp') ? 'FC+' : has('fc') ? 'FC' : null;
-      const syncMark = has('fsdp') ? 'FDX+' : has('fsd') ? 'FDX' : has('fsp') ? 'FS+' : has('fs') ? 'FS' : null;
-      if (comboMark || syncMark) {
-        store[`${title}|${diffNo}|${dx}`] = { comboMark, syncMark };
-        n++;
+  // DOMから拾ってlocalStorageに貯め、対象曲ページでの実行時に合流させる。
+  // ページ構造に依存しないよう、曲名要素から親をたどって行を特定する。
+  if (!location.pathname.includes('ratingTargetMusic')) {
+    const nameEls = document.querySelectorAll('.music_name_block');
+    if (nameEls.length > 0) {
+      const store = JSON.parse(localStorage.getItem('grc-marks') ?? '{}');
+      const seen = new Set();
+      let n = 0;
+      for (const nameEl of nameEls) {
+        const row = nameEl.closest('form') ?? nameEl.parentElement;
+        if (!row) continue;
+        const title = nameEl.textContent.trim();
+        if (!title) continue;
+        const icons = [...row.querySelectorAll('img')].map((i) => i.getAttribute('src') ?? '');
+        icons.forEach((s) => {
+          const m = s.match(/music_icon_[a-z0-9_]+/);
+          if (m) seen.add(m[0]);
+        });
+        // 難易度は行のclassか、行内のdiff_*.png画像から判定する
+        const cls = row.className + ' ' + (row.parentElement?.className ?? '');
+        const diffSrc = icons.find((s) => /diff_[a-z]+\.png/.test(s)) ?? '';
+        const dtext = cls + ' ' + diffSrc;
+        const diffNo = /remaster/.test(dtext) ? 4 : /master/.test(dtext) ? 3
+          : /expert/.test(dtext) ? 2 : /advanced/.test(dtext) ? 1 : 0;
+        const has = (x) => icons.some((u) => u.includes(`music_icon_${x}.`));
+        const dx = icons.some((u) => u.includes('music_dx')) ? 1 : 0;
+        const comboMark = has('app') ? 'AP+' : has('ap') ? 'AP'
+          : has('fcp') ? 'FC+' : has('fc') ? 'FC' : null;
+        const syncMark = has('fsdp') ? 'FDX+' : has('fsd') ? 'FDX'
+          : has('fsp') ? 'FS+' : has('fs') ? 'FS' : null;
+        if (comboMark || syncMark) {
+          store[`${title}|${diffNo}|${dx}`] = { comboMark, syncMark };
+          n++;
+        }
       }
+      localStorage.setItem('grc-marks', JSON.stringify(store));
+      console.log('[maimai] このページのマークアイコン:', [...seen].sort().join(', ') || '(なし)');
+      alert(`このページから ${n} 曲のマークを記録しました（累計 ${Object.keys(store).length} 件）。\n` +
+        `曲数 ${nameEls.length}、検出アイコン: ${[...seen].sort().join(', ') || 'なし'}\n` +
+        '難易度ごとにスコア一覧を開いて実行し、最後にレーティング対象曲ページで実行してください');
+      return;
     }
-    localStorage.setItem('grc-marks', JSON.stringify(store));
-    alert(`このページから ${n} 曲のマークを記録しました（累計 ${Object.keys(store).length} 件）。\n` +
-      'MASTER/Re:MASTER/EXPERT など他の難易度でも実行し、最後にレーティング対象曲ページで実行してください');
-    return;
   }
   if (!location.pathname.includes('ratingTargetMusic')) {
     alert('レーティング対象曲ページ（レコード→RATING対象曲）で実行してください\n※このページの閲覧にはmaimaiでらっくすNETのスタンダードコース（有料）加入が必要です\n（FC/APマークを入れたい場合は、先にレコード→ジャンル別スコアページでも実行）');
