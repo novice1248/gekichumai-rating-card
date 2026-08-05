@@ -755,9 +755,9 @@ function drawSummaryColumn(ctx, x, y, w, h, game, data, { showBest, bestCount, s
 
   drawRatingText(ctx, ratingText, x + 22, y + 78, 62, isRainbow ? null : tier.color);
 
+  // 段位はレーティング数字の色で示すので、文字のバッジは出さない。
+  // 空いた行に枠ごとの平均と目安の定数を置く
   const badgeY = y + 158;
-  drawTierBadge(ctx, x + 22, badgeY, tier);
-  // 段位バッジの行から下は右側が空くので、枠ごとの平均と目安の定数をそこに置く
   drawFrameStats(ctx, x + w - 22, y + 152, game, data, 'right');
 
   if (showBest && (data.best?.length ?? 0) + (data.recent?.length ?? 0) > 0) {
@@ -811,22 +811,6 @@ function drawSummaryColumn(ctx, x, y, w, h, game, data, { showBest, bestCount, s
       ry += rowH;
     });
   }
-}
-
-function drawTierBadge(ctx, x, y, tier) {
-  // 段位バッジは箱なし（段位色のダイヤ＋テキストのみ）
-  const isRainbow = tier.color === null;
-  ctx.save();
-  ctx.translate(x + 8, y + 14);
-  ctx.rotate(Math.PI / 4);
-  ctx.shadowColor = isRainbow ? '#ffffff' : tier.color;
-  ctx.shadowBlur = 8;
-  ctx.fillStyle = isRainbow ? rainbowGradient(ctx, -6, -6, 12) : tier.color;
-  ctx.fillRect(-5.5, -5.5, 11, 11);
-  ctx.restore();
-  ctx.fillStyle = 'rgba(255,255,255,0.82)';
-  ctx.font = `700 14px ${FONT}`;
-  ctx.fillText(`${tier.name}レート`, x + 22, y + 6);
 }
 
 function ratingFill(ctx, color, x, y, sizePx = 62) {
@@ -973,9 +957,6 @@ async function drawGridSection(ctx, W, cols, y, game, data, { bestCount, showSco
   const rw = ctx.measureText(ratingText).width;
   const rx = W - GRID_SIDE - rw - 16;
   drawRatingText(ctx, ratingText, rx, y + 14, 38, isRainbow ? null : tier.color);
-  ctx.font = `700 14px ${FONT}`;
-  const btw = ctx.measureText(`${tier.name}レート`).width + 22;
-  drawTierBadge(ctx, W - GRID_SIDE - btw - 16, y + 58, tier);
   drawSigWarning(ctx, rx - 20, y + 26, sigState);
 
   // タイル（全枠モードでは BEST / NEW / P-SCORE をサブ見出し（定員つき）で描く）
