@@ -162,6 +162,8 @@
       img.src = src;
     });
   let loggedSample = false;
+  // ランプのアイコン名はNET側の変更で変わりうるので、実際に出た名前を控えて出す
+  const lampIcons = new Set();
   const __jList = [...best, ...recent].filter((s) => s._idx && s._token);
   let __ji = 0;
   for (const s of [...best, ...recent]) {
@@ -177,6 +179,19 @@
         }).toString(),
       });
       const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
+      // 同じ詳細ページからクリアランプ（AJ/FC）も拾う。追加のリクエストは要らない
+      {
+        const srcs = [...doc.querySelectorAll('img')].map((i) => i.getAttribute('src') ?? '');
+        srcs.forEach((u) => {
+          const m = u.match(/icon_[a-z0-9_]+/);
+          if (m) lampIcons.add(m[0]);
+        });
+        const hit = (re) => srcs.some((u) => re.test(u));
+        s.comboMark = hit(/alljustice(critical)?/i) ? 'AJ'
+          : hit(/fullcombo|full_combo/i) ? 'FC' : null;
+        s.chainMark = hit(/fullchain2|fullchain_gold/i) ? 'FC2'
+          : hit(/fullchain/i) ? 'FC1' : null;
+      }
       // 詳細ページ内のジャケット: /mobile/img/ 配下でUI部品でない最初の画像
       const imgEl = [...doc.querySelectorAll('img')].find((i) => {
         const src = i.getAttribute('src') ?? '';
@@ -197,6 +212,7 @@
     await sleep(400);
   }
 
+  console.log('[chunithm] 詳細ページのアイコン:', [...lampIcons].sort().join(', ') || '(なし)');
   const strip = (l) => l.map(({ _idx, _img, _diff, _genre, _token, ...s }) => s);
   const out = {
     game: 'chunithm',
