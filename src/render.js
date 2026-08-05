@@ -4,7 +4,7 @@
 //   - grid:    ジャケット主体のタイルグリッド型（縦長・機種ごとのセクション）
 // ジャケットURLが無い曲は曲名から生成する疑似ジャケットで埋める。
 
-import { GAME_META, tierOf, gekichumaiPower, formatSongRating } from './tiers.js';
+import { GAME_META, tierOf, gekichumaiPower, formatSongRating, frameStats } from './tiers.js';
 import { rankOf, rankColor, formatScore } from './rank.js';
 
 export const CARD_W = 1200;
@@ -650,6 +650,49 @@ function drawSummary(ctx, dataByGame, { showBest, bestCount, nameOverride, sigSt
   if (allRainbow(dataByGame)) drawRainbowFrame(ctx, CARD_W, SUMMARY_H);
 }
 
+/**
+ * 枠ごとの平均レートと目安の定数。空いている領域に小さく置く。
+ * @param {'left'|'right'} align 右揃えなら x を右端として扱う
+ */
+function drawFrameStats(ctx, x, y, game, data, align = 'left') {
+  const stats = frameStats(game, data);
+  if (stats.length === 0) return;
+  const digits = game === 'ongeki' ? 3 : game === 'chunithm' ? 2 : 0;
+  ctx.save();
+  ctx.textBaseline = 'top';
+  stats.forEach((s, i) => {
+    const ly = y + i * 17;
+    const avg = s.key === 'platinum' ? s.avg.toFixed(3) : s.avg.toFixed(digits);
+    const req = s.reqConst > 0 ? `≒定数 ${s.reqConst.toFixed(1)}` : '';
+    ctx.textAlign = align === 'right' ? 'right' : 'left';
+    const lx = align === 'right' ? x : x;
+    ctx.fillStyle = 'rgba(255,255,255,0.32)';
+    ctx.font = `700 11px ${FONT}`;
+    if (align === 'right') {
+      ctx.fillText(req, lx, ly + 1);
+      ctx.fillStyle = 'rgba(255,255,255,0.62)';
+      ctx.font = `700 13px ${NUM_FONT}`;
+      const reqW = 78;
+      ctx.fillText(avg, lx - reqW, ly);
+      ctx.fillStyle = 'rgba(255,255,255,0.32)';
+      ctx.font = `700 11px ${FONT}`;
+      ctx.fillText(s.label, lx - reqW - 54, ly + 1);
+    } else {
+      ctx.fillText(s.label, lx, ly + 1);
+      ctx.fillStyle = 'rgba(255,255,255,0.62)';
+      ctx.font = `700 13px ${NUM_FONT}`;
+      ctx.textAlign = 'right';
+      ctx.fillText(avg, lx + 96, ly);
+      ctx.textAlign = 'left';
+      ctx.fillStyle = 'rgba(255,255,255,0.32)';
+      ctx.font = `700 11px ${FONT}`;
+      ctx.fillText(req, lx + 104, ly + 1);
+    }
+  });
+  ctx.textAlign = 'left';
+  ctx.restore();
+}
+
 /** チェックサム未検証マーク（気休めの抑止。→ schema.js verifySignature） */
 function drawSigWarning(ctx, x, y, sigState) {
   if (sigState !== 'invalid' && sigState !== 'missing') return;
@@ -714,17 +757,20 @@ function drawSummaryColumn(ctx, x, y, w, h, game, data, { showBest, bestCount, s
 
   const badgeY = y + 158;
   drawTierBadge(ctx, x + 22, badgeY, tier);
+  // 段位バッジの行から下は右側が空くので、枠ごとの平均と目安の定数をそこに置く
+  drawFrameStats(ctx, x + w - 22, y + 152, game, data, 'right');
 
-  if (showBest && data.best.length > 0) {
+  if (showBest && (data.best?.length ?? 0) + (data.recent?.length ?? 0) > 0) {
     let ry = badgeY + 54;
     // パネル下端からはみ出さない行数に自動クランプ
     const maxRows = Math.max(1, Math.floor((y + h - (ry + 22) - 14) / 30));
-    const count = Math.min(bestCount, maxRows, data.best.length);
+    const songs = mergedTop(data);
+    const count = Math.min(bestCount, maxRows, songs.length);
     ctx.fillStyle = 'rgba(255,255,255,0.35)';
     ctx.font = `700 12px ${FONT}`;
     drawTracked(ctx, `BEST ${count}`, x + 22, ry, 3);
     ry += 22;
-    data.best.slice(0, count).forEach((s, i) => {
+    songs.slice(0, count).forEach((s, i) => {
       const rowH = 30;
       if (i % 2 === 0) {
         ctx.fillStyle = 'rgba(255,255,255,0.045)';
@@ -820,10 +866,18 @@ function tileWidth(W, cols) {
 /** 表示する曲数。bestCount='all' なら機種の枠の定義どおり
  *  （ベスト全曲＋新曲枠＋プラチナ枠(オンゲキ)も表示） */
 function frameCounts(d, bestCount) {
-  const nBest = bestCount === 'all' ? d.best.length : Math.min(bestCount, d.best.length);
+  const nBest = bestCount === 'all' ? d.best.length : Math.min(bestCount, mergedTop(d).length);
   const nRec = bestCount === 'all' ? (d.recent?.length ?? 0) : 0;
   const nPlat = bestCount === 'all' ? (d.platinum?.length ?? 0) : 0;
   return { nBest, nRec, nPlat };
+}
+
+/** 曲数を絞って出すときは枠を分けず、旧曲＋新曲の単曲レート上位を並べる
+ *  （枠ごとに見たいときは「全枠」を使う） */
+function mergedTop(d) {
+  return [...(d.best ?? []), ...(d.recent ?? [])]
+    .slice()
+    .sort((a, b) => (b.ratingValue ?? -1) - (a.ratingValue ?? -1));
 }
 
 function rowsHeight(n, W, cols) {
@@ -910,6 +964,8 @@ async function drawGridSection(ctx, W, cols, y, game, data, { bestCount, showSco
 
   drawGameTag(ctx, x + 14, y + 18, game, meta, 30);
 
+  drawFrameStats(ctx, x + 250, y + 22, game, data, 'left');
+
   const tier = tierOf(meta.tiers, data.rating);
   const isRainbow = tier.color === null;
   const ratingText = meta.formatRating(data.rating);
@@ -957,7 +1013,7 @@ async function drawGridSection(ctx, W, cols, y, game, data, { bestCount, showSco
       await drawGroup(data.platinum, nPlat, ty, 'P-SCORE', caps.platinum, 'platinum');
     }
   } else {
-    await drawGroup(data.best, nBest, ty, null);
+    await drawGroup(mergedTop(data), nBest, ty, null);
   }
 
   return y + secH;
@@ -970,8 +1026,10 @@ const DIFF_STYLE = {
   EXPERT: { label: 'EXP', color: '#ef5362' },
   MASTER: { label: 'MAS', color: '#ab7ee0' },
   'Re:MASTER': { label: 'Re:M', color: '#e6c9ff' },
-  ULTIMA: { label: 'ULT', color: '#d04a5f' },
-  LUNATIC: { label: 'LUN', color: '#ff8a9b' },
+  // ULTIMAは黒地に赤の公式配色。EXPERTの赤と紛れないよう暗く濁らせて差をつける
+  ULTIMA: { label: 'ULT', color: '#b3173a' },
+  // オンゲキのLUNATICはmaimaiのRe:MASTERと同じ位置づけなので淡い紫に寄せる
+  LUNATIC: { label: 'LUN', color: '#e6c9ff' },
 };
 
 function diffStyleOf(difficulty) {
